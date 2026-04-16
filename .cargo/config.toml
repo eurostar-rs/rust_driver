@@ -1,0 +1,14 @@
+[build]
+target = "x86_64-pc-windows-msvc"
+
+[target.x86_64-pc-windows-msvc]
+rustflags = [
+    # Tell the linker not to include user-mode libraries like msvcrt
+    "-C", "link-arg=/NODEFAULTLIB",
+    # Tell Windows this is a native kernel binary, not a GUI/Console app
+    "-C", "link-arg=/SUBSYSTEM:NATIVE",
+    # Specifically format the binary as a kernel driver
+    "-C", "link-arg=/DRIVER",
+    # Generate dynamic base relocation tables (required by modern Windows)
+    "-C", "link-arg=/DYNAMICBASE" 
+]
