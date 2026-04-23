@@ -13,7 +13,39 @@ type PVOID = *mut core::ffi::c_void;
 
 const STATUS_SUCCESS: NTSTATUS = 0;
 
+pub type PFLT_CONNECT_NOTIFY = Option<
+    extern "system" fn(
+        client_port: PVOID,
+        server_port_cookie: PVOID,
+        connection_context: PVOID,
+        size_of_context: u32,
+        connection_port_cookie: *mut PVOID
+    ) -> NTSTATUS>;
 
+pub type PFLT_DISCONNECT_NOTIFY = Option<
+    extern "system" fn(
+        connection_cookie: PVOID,
+    )>;
+
+pub type PFLT_MESSAGE_NOTIFY = Option<
+    extern "system" fn(
+        port_cookie: PVOID,
+        input_buffer: PVOID,
+        input_buffer_length: u32,
+        output_buffer: PVOID,
+        output_buffer_length: u32,
+        return_output_buffer_length: *mut u32
+    ) -> NTSTATUS>;
+
+#[repr(C)]
+struct OBJECT_ATTRIBUTES {
+    length: u32,
+    root_directory: PVOID,
+    object_name: *mut UNICODE_STRING,
+    attributes: u32,
+    security_descriptor: PVOID,
+    security_quality_of_service: PVOID
+}
 
 // FLT_REGISTRATION = https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/fltkernel/ns-fltkernel-_flt_registration
 
@@ -65,7 +97,23 @@ extern "system" {
     ) -> NTSTATUS;
 
     fn FltStartFiltering(filter: PVOID) -> NTSTATUS;
+
+fn FltCreateCommunicationPort(
+        filter: PVOID,
+        port: *mut PVOID,
+        object_attributes: *mut OBJECT_ATTRIBUTES,
+        server_port_cookie: PVOID,
+        connect_notify_callback: PFLT_CONNECT_NOTIFY,
+        disconnect_notify_callback: PFLT_DISCONNECT_NOTIFY,
+        message_notify_callback: PFLT_MESSAGE_NOTIFY,
+        max_connections: i32
+    ) -> NTSTATUS;
+
+fn FltCloseCommunicationPort(
+        server_port: PVOID
+    ) -> ();
 }
+
 
 #[link(name = "ntoskrnl")]
 extern "system" {
@@ -94,7 +142,7 @@ unsafe extern "system" fn pre_write_callback(
         let msg = b"new file on disk detected: %wZ\n\0";
         DbgPrint(msg.as_ptr(), &(*name_info).Name);
 
-        // relese memory
+        // release memory
         FltReleaseFileNameInformation(name_info);
     } else {
         let err_msg = b"error: \n\0";
